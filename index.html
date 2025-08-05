@@ -302,7 +302,6 @@
   const pageHeight = originalViewport.height;
   const pdfDoc = new jsPDF({ unit: 'px', format: [pageWidth, pageHeight] });
 
-  // Prepare to overlay summary text on first page
   const summaryLines = ['PDF Markup Summary'];
   colors.forEach(color => {
     const labelInput = document.querySelector(`.color-dot[data-color='${color}']`).nextSibling;
@@ -311,15 +310,7 @@
       summaryLines.push(`${label} (${color}): ${counts[color]}`);
     }
   });
-  colors.forEach(color => {
-    if (counts[color] > 0) {
-      pdfDoc.setTextColor(color);
-      pdfDoc.text(`${color}: ${counts[color]}`, 10, textY);
-      textY += 18;
-    }
-  });
 
-  // Add all pages after the summary
   for (let i = 1; i <= totalPages; i++) {
     const page = await pdf.getPage(i);
     const viewport = page.getViewport({ scale: 1 });
@@ -330,13 +321,13 @@
     await page.render({ canvasContext: ctxTemp, viewport }).promise;
 
     const imgData = canvasTemp.toDataURL('image/jpeg');
-    if (!(i === 1)) {
+
+    if (i !== 1) {
       pdfDoc.addPage([viewport.width, viewport.height]);
       pdfDoc.setPage(pdfDoc.getNumberOfPages());
     }
     pdfDoc.addImage(imgData, 'JPEG', 0, 0, viewport.width, viewport.height);
 
-    // Add summary overlay only on first page
     if (i === 1) {
       pdfDoc.setFontSize(14);
       pdfDoc.setTextColor(0, 0, 0);
