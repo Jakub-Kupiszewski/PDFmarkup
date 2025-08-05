@@ -13,13 +13,10 @@
       position: sticky;
       top: 0;
       z-index: 999;
-      background-color: #f5f5f5;
-      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
       display: flex;
       justify-content: center;
       align-items: center;
       padding: 10px;
-      background: #f5f5f5;
       flex-wrap: wrap;
     }
     .color-dot-wrapper {
@@ -44,7 +41,7 @@
       overflow: auto;
       width: 100%;
       height: 80vh;
-      border: 1px solid #ccc;
+      border: 0px solid #ccc;
     }
     canvas {
       display: block;
@@ -92,7 +89,9 @@
       touch-action: manipulation;
     }
 
-    .button-1:hover,
+    .button-1:hover {
+      background-color: #ebdfb5;
+      }
     .button-1:focus {
       background-color: #d6d6d6;
     }
@@ -102,12 +101,18 @@
       font-weight: bold;
     }
   #color-tools {
+  position: fixed;
+  top: 50%;
+  left: 10px;
+  transform: translateY(-50%);
+  background-color: rgba(247, 247, 247, 0.7);
+  padding: 10px;
+  border-radius: 8px;
   display: flex;
-  flex-direction: row;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 10px;
+  flex-direction: column;
+  align-items: flex-start;
+  z-index: 1000;
+  transition: transform 0.3s ease, opacity 0.3s ease;
 }
 </style>
 </head>
@@ -157,7 +162,7 @@
     function previousPage() {
       if (currentPage > 1) {
         currentPage--;
-        renderPage(currentPage);
+        fitToScreen();
       }
     }
 
@@ -188,12 +193,16 @@
       label.value = `item ${colors.indexOf(color) + 1}`;
       label.style.marginTop = '5px';
       label.style.fontSize = '12px';
-      label.style.textAlign = 'center';
+      label.style.textAlign = 'left';
       label.style.width = '60px';
+      label.style.border = 'none';
+      label.style.outline = 'none';
+      label.style.background = 'transparent';
 
       const countText = document.createElement('div');
       countText.id = `count-${color}`;
       countText.textContent = '0';
+      countText.style.fontSize = '20px';
 
       const resetBtn = document.createElement('button');
       resetBtn.textContent = 'Reset';
@@ -206,10 +215,24 @@
         renderPage(currentPage);
       };
 
-      wrapper.appendChild(dot);
-      wrapper.appendChild(label);
-      wrapper.appendChild(countText);
-      wrapper.appendChild(resetBtn);
+      const dotLabelWrapper = document.createElement('div');
+      dotLabelWrapper.style.display = 'flex';
+      dotLabelWrapper.style.alignItems = 'center';
+      dotLabelWrapper.style.gap = '8px';
+
+      dotLabelWrapper.appendChild(dot);
+      const labelContainer = document.createElement('div');
+      labelContainer.style.display = 'block';
+      const labelLine = document.createElement('div');
+      labelLine.style.display = 'flex';
+      labelLine.style.alignItems = 'center';
+      labelLine.style.gap = '4px';
+      labelLine.appendChild(label);
+      labelLine.appendChild(countText);
+      labelContainer.appendChild(labelLine);
+      labelContainer.appendChild(resetBtn);
+      dotLabelWrapper.appendChild(labelContainer);
+      wrapper.appendChild(dotLabelWrapper);
       toolbar.appendChild(wrapper);
 
       counts[color] = 0;
@@ -228,10 +251,10 @@
       reader.onload = function () {
         const typedarray = new Uint8Array(this.result);
         pdfjsLib.getDocument(typedarray).promise.then(doc => {
-          pdf = doc;
-          totalPages = doc.numPages;
-          currentPage = 1;
-          renderPage(currentPage);
+        pdf = doc;
+        totalPages = doc.numPages;
+        currentPage = 1;
+        fitToScreen();
         });
       };
       reader.readAsArrayBuffer(file);
@@ -301,6 +324,7 @@
   const pageWidth = originalViewport.width;
   const pageHeight = originalViewport.height;
   const pdfDoc = new jsPDF({ unit: 'px', format: [pageWidth, pageHeight] });
+
 
   const summaryLines = ['PDF Markup Summary'];
   colors.forEach(color => {
@@ -377,7 +401,7 @@ const timestamp = `${dateStr}_${timeStr}`;
     function fitToScreen() {
       const containerWidth = container.clientWidth;
       pdf.getPage(currentPage).then(page => {
-        const viewportUnscaled = page.getViewport({ scale: 1 });
+        const viewportUnscaled = page.getViewport({ scale: 2 });
         scale = containerWidth / viewportUnscaled.width;
         renderPage(currentPage);
       });
@@ -393,5 +417,6 @@ const timestamp = `${dateStr}_${timeStr}`;
       }
     }
   </script>
+
 </body>
 </html>
