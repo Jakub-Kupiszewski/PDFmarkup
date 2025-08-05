@@ -94,18 +94,27 @@
 
     .button-1:hover,
     .button-1:focus {
-      background-color: #F082AC;
+      background-color: #d6d6d6;
     }
 
     #zoom-level {
       margin-left: 10px;
       font-weight: bold;
     }
-  </style>
+  #color-tools {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+</style>
 </head>
 <body>
-  <div id="toolbar"></div>
   <div id="toolbar">
+  <div id="color-tools"></div>
+  <div id="button-group" style="width: 100%; text-align: center; margin-top: 10px;">
     <input type="file" id="upload" accept="application/pdf" class="button-1">
     <button onclick="savePDF()" class="button-1">Save Marked PDF</button>
     <button onclick="resetMarks()" class="button-1">Reset</button>
@@ -118,7 +127,8 @@
     <span id="zoom-level">Zoom: 100%</span>
     <span id="page-info" style="margin-left: 10px; font-weight: bold;">Page: 1</span>
   </div>
-  <div id="canvas-container">
+</div>
+<div id="canvas-container">
     <canvas id="pdf-canvas"></canvas>
   </div>
 
@@ -129,7 +139,7 @@
     let selectedColor = colors[0];
     let pdf = null, currentPage = 1, totalPages = 1, viewport = null, scale = 1;
 
-    const toolbar = document.getElementById('toolbar');
+    const toolbar = document.getElementById('color-tools');
     const container = document.getElementById('canvas-container');
     const canvas = document.getElementById('pdf-canvas');
     const ctx = canvas.getContext('2d');
@@ -158,7 +168,20 @@
       }
     }
 
-    $1
+    colors.forEach(color => {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'color-dot-wrapper';
+
+      const dot = document.createElement('div');
+      dot.className = 'color-dot';
+      dot.style.backgroundColor = color;
+      dot.dataset.color = color;
+      if (color === selectedColor) dot.classList.add('selected');
+      dot.onclick = () => {
+        document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('selected'));
+        dot.classList.add('selected');
+        selectedColor = color;
+      };
 
       const label = document.createElement('input');
       label.type = 'text';
@@ -167,6 +190,10 @@
       label.style.fontSize = '12px';
       label.style.textAlign = 'center';
       label.style.width = '60px';
+
+      const countText = document.createElement('div');
+      countText.id = `count-${color}`;
+      countText.textContent = '0';
 
       const resetBtn = document.createElement('button');
       resetBtn.textContent = 'Reset';
@@ -179,7 +206,8 @@
         renderPage(currentPage);
       };
 
-      $1wrapper.appendChild(label);
+      wrapper.appendChild(dot);
+      wrapper.appendChild(label);
       wrapper.appendChild(countText);
       wrapper.appendChild(resetBtn);
       toolbar.appendChild(wrapper);
