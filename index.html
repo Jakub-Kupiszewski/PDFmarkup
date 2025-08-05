@@ -297,7 +297,7 @@
     async function savePDF() {
   const { jsPDF } = window.jspdf;
   const firstPage = await pdf.getPage(1);
-  const originalViewport = firstPage.getViewport({ scale: 1 });
+  const originalViewport = firstPage.getViewport({ scale: 2 });
   const pageWidth = originalViewport.width;
   const pageHeight = originalViewport.height;
   const pdfDoc = new jsPDF({ unit: 'px', format: [pageWidth, pageHeight] });
