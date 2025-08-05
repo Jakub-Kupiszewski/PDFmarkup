@@ -26,6 +26,17 @@
     #canvas-container {
       position: relative;
     }
+    .color-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0 5px;
+  text-align: center;
+  font-size: 12px;
+}
+.count-label {
+  margin-top: 3px;
+}
     canvas {
       display: block;
     }
@@ -59,27 +70,38 @@
     const ctx = canvas.getContext('2d');
 
     colors.forEach(color => {
-      const dot = document.createElement('div');
-      dot.className = 'color-dot';
-      dot.style.backgroundColor = color;
-      dot.dataset.color = color;
-      dot.title = `${color} (0)`;
-      if (color === selectedColor) dot.classList.add('selected');
-      dot.onclick = () => {
-        document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('selected'));
-        dot.classList.add('selected');
-        selectedColor = color;
-      };
-      toolbar.appendChild(dot);
-      counts[color] = 0;
-    });
+  const container = document.createElement('div');
+  container.className = 'color-container';
 
-    function updateCounts() {
-      document.querySelectorAll('.color-dot').forEach(dot => {
-        const color = dot.dataset.color;
-        dot.title = `${color} (${counts[color]})`;
-      });
-    }
+  const dot = document.createElement('div');
+  dot.className = 'color-dot';
+  dot.style.backgroundColor = color;
+  dot.dataset.color = color;
+  if (color === selectedColor) dot.classList.add('selected');
+  dot.onclick = () => {
+    document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('selected'));
+    dot.classList.add('selected');
+    selectedColor = color;
+  };
+
+  const label = document.createElement('div');
+  label.className = 'count-label';
+  label.id = `count-${color}`;
+  label.innerText = '0';
+
+  container.appendChild(dot);
+  container.appendChild(label);
+  toolbar.appendChild(container);
+
+  counts[color] = 0;
+});
+
+function updateCounts() {
+  colors.forEach(color => {
+    const label = document.getElementById(`count-${color}`);
+    if (label) label.innerText = counts[color];
+  });
+}
 
     document.getElementById('upload').addEventListener('change', e => {
       const file = e.target.files[0];
