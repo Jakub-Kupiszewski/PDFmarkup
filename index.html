@@ -32,6 +32,10 @@
     }
     #canvas-container {
       position: relative;
+      overflow: auto;
+      width: 100%;
+      height: 80vh;
+      border: 1px solid #ccc;
     }
     canvas {
       display: block;
@@ -52,6 +56,10 @@
       border: none;
       background: none;
     }
+    #zoom-level {
+      margin-left: 10px;
+      font-weight: bold;
+    }
   </style>
 </head>
 <body>
@@ -59,6 +67,11 @@
   <input type="file" id="upload" accept="application/pdf">
   <button onclick="savePDF()">Save Marked PDF</button>
   <button onclick="resetMarks()">Reset</button>
+  <button onclick="zoomIn()">Zoom In</button>
+  <button onclick="zoomOut()">Zoom Out</button>
+  <button onclick="fitToScreen()">Fit to Screen</button>
+  <button onclick="toggleFullscreen()">Fullscreen</button>
+  <span id="zoom-level">Zoom: 100%</span>
   <div id="canvas-container">
     <canvas id="pdf-canvas"></canvas>
   </div>
@@ -68,12 +81,17 @@
     const counts = {};
     const marks = [];
     let selectedColor = colors[0];
-    let pdf = null, currentPage = null, viewport = null;
+    let pdf = null, currentPage = null, viewport = null, scale = 1;
 
     const toolbar = document.getElementById('toolbar');
     const container = document.getElementById('canvas-container');
     const canvas = document.getElementById('pdf-canvas');
     const ctx = canvas.getContext('2d');
+    const zoomDisplay = document.getElementById('zoom-level');
+
+    function updateZoomLevel() {
+      zoomDisplay.textContent = `Zoom: ${Math.round(scale * 100)}%`;
+    }
 
     colors.forEach(color => {
       const wrapper = document.createElement('div');
@@ -98,18 +116,13 @@
       resetBtn.textContent = 'Reset';
       resetBtn.className = 'reset-button';
       resetBtn.onclick = () => {
-        // Remove marks of this color
         for (let i = marks.length - 1; i >= 0; i--) {
-          if (marks[i].color === color) {
-            marks.splice(i, 1);
-          }
+          if (marks[i].color === color) marks.splice(i, 1);
         }
         counts[color] = 0;
         updateCounts();
         document.querySelectorAll(`.mark`).forEach(mark => {
-          if (mark.style.backgroundColor === color) {
-            mark.remove();
-          }
+          if (mark.style.backgroundColor === color) mark.remove();
         });
       };
 
@@ -144,25 +157,68 @@
     function renderPage(pageNum) {
       pdf.getPage(pageNum).then(page => {
         currentPage = page;
-        viewport = page.getViewport({ scale: 1 });
+        viewport = page.getViewport({ scale: scale });
         canvas.width = viewport.width;
         canvas.height = viewport.height;
         container.style.width = viewport.width + 'px';
         container.style.height = viewport.height + 'px';
         const renderContext = { canvasContext: ctx, viewport: viewport };
         page.render(renderContext);
+        redrawMarks();
+        updateZoomLevel();
+      });
+    }
+
+    function zoomIn() {
+      scale += 0.1;
+      renderPage(1);
+    }
+
+    function zoomOut() {
+      if (scale > 0.2) {
+        scale -= 0.1;
+        renderPage(1);
+      }
+    }
+
+    function fitToScreen() {
+      if (!viewport) return;
+      const containerWidth = window.innerWidth - 40;
+      scale = containerWidth / viewport.width;
+      renderPage(1);
+    }
+
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen();
+      } else {
+        document.exitFullscreen();
+      }
+    }
+
+    function redrawMarks() {
+      document.querySelectorAll('.mark').forEach(mark => mark.remove());
+      marks.forEach(({ x, y, color }) => {
+        const scaledX = x * scale;
+        const scaledY = y * scale;
+        const dot = document.createElement('div');
+        dot.className = 'mark';
+        dot.style.left = `${scaledX - 5}px`;
+        dot.style.top = `${scaledY - 5}px`;
+        dot.style.backgroundColor = color;
+        container.appendChild(dot);
       });
     }
 
     container.addEventListener('click', e => {
       const rect = canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
+      const x = (e.clientX - rect.left) / scale;
+      const y = (e.clientY - rect.top) / scale;
 
       const dot = document.createElement('div');
       dot.className = 'mark';
-      dot.style.left = `${x - 5}px`;
-      dot.style.top = `${y - 5}px`;
+      dot.style.left = `${x * scale - 5}px`;
+      dot.style.top = `${y * scale - 5}px`;
       dot.style.backgroundColor = selectedColor;
       container.appendChild(dot);
 
@@ -184,13 +240,11 @@
       const imgData = canvas.toDataURL('image/jpeg');
       pdfDoc.addImage(imgData, 'JPEG', 0, 0, canvas.width, canvas.height);
 
-      // Draw marks
       marks.forEach(mark => {
         pdfDoc.setFillColor(mark.color);
         pdfDoc.circle(mark.x, mark.y, 5, 'F');
       });
 
-      // Add count summary at the top
       pdfDoc.setFontSize(12);
       let textY = 20;
       pdfDoc.setTextColor(0, 0, 0);
@@ -206,6 +260,16 @@
 
       pdfDoc.save('marked.pdf');
     }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.ctrlKey && e.key === '+') {
+        e.preventDefault();
+        zoomIn();
+      } else if (e.ctrlKey && e.key === '-') {
+        e.preventDefault();
+        zoomOut();
+      }
+    });
   </script>
 </body>
 </html>
