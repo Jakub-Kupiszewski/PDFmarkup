@@ -192,9 +192,33 @@
     await page.render({ canvasContext: ctxTemp, viewport }).promise;
 
     const imgData = canvasTemp.toDataURL('image/jpeg');
-    pdfDoc.addPage([viewport.width, viewport.height]);
-    pdfDoc.setPage(i + 1);
-    pdfDoc.addImage(imgData, 'JPEG', 0, 0, viewport.width, viewport.height);
+
+    if (i === 1) {
+      // Place summary text before drawing the first page
+      pdfDoc.addPage([viewport.width, viewport.height]);
+      pdfDoc.setPage(1);
+      pdfDoc.addImage(imgData, 'JPEG', 0, 0, viewport.width, viewport.height);
+
+      // Overlay summary
+      pdfDoc.setFontSize(14);
+      let textY = 30;
+      pdfDoc.setTextColor(0, 0, 0);
+      pdfDoc.text('PDF Markup Summary', 10, textY);
+      textY += 20;
+      colors.forEach(color => {
+        const labelInput = document.querySelector(`.color-dot[data-color='${color}']`).nextSibling;
+        const label = labelInput && labelInput.value ? labelInput.value : `item ${colors.indexOf(color) + 1}`;
+        if (counts[color] > 0) {
+          pdfDoc.setTextColor(color);
+          pdfDoc.text(`${label} (${color}): ${counts[color]}`, 10, textY);
+          textY += 18;
+        }
+      });
+    } else {
+      pdfDoc.addPage([viewport.width, viewport.height]);
+      pdfDoc.setPage(i + 1);
+      pdfDoc.addImage(imgData, 'JPEG', 0, 0, viewport.width, viewport.height);
+    }
 
     if (marks[i]) {
       marks[i].forEach(mark => {
