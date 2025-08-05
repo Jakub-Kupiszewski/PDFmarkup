@@ -11,12 +11,19 @@
       align-items: center;
       padding: 10px;
       background: #f5f5f5;
+      flex-wrap: wrap;
+    }
+    .color-dot-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin: 5px;
+      font-size: 12px;
     }
     .color-dot {
       width: 25px;
       height: 25px;
       border-radius: 50%;
-      margin: 5px;
       cursor: pointer;
       border: 2px solid transparent;
     }
@@ -26,17 +33,6 @@
     #canvas-container {
       position: relative;
     }
-    .color-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  margin: 0 5px;
-  text-align: center;
-  font-size: 12px;
-}
-.count-label {
-  margin-top: 3px;
-}
     canvas {
       display: block;
     }
@@ -47,12 +43,22 @@
       border-radius: 50%;
       pointer-events: none;
     }
+    .reset-button {
+      font-size: 10px;
+      margin-top: 2px;
+      cursor: pointer;
+      color: blue;
+      text-decoration: underline;
+      border: none;
+      background: none;
+    }
   </style>
 </head>
 <body>
   <div id="toolbar"></div>
   <input type="file" id="upload" accept="application/pdf">
   <button onclick="savePDF()">Save Marked PDF</button>
+  <button onclick="resetMarks()">Reset</button>
   <div id="canvas-container">
     <canvas id="pdf-canvas"></canvas>
   </div>
@@ -62,7 +68,7 @@
     const counts = {};
     const marks = [];
     let selectedColor = colors[0];
-    let pdf = null, currentPage = null;
+    let pdf = null, currentPage = null, viewport = null;
 
     const toolbar = document.getElementById('toolbar');
     const container = document.getElementById('canvas-container');
@@ -70,38 +76,56 @@
     const ctx = canvas.getContext('2d');
 
     colors.forEach(color => {
-  const container = document.createElement('div');
-  container.className = 'color-container';
+      const wrapper = document.createElement('div');
+      wrapper.className = 'color-dot-wrapper';
 
-  const dot = document.createElement('div');
-  dot.className = 'color-dot';
-  dot.style.backgroundColor = color;
-  dot.dataset.color = color;
-  if (color === selectedColor) dot.classList.add('selected');
-  dot.onclick = () => {
-    document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('selected'));
-    dot.classList.add('selected');
-    selectedColor = color;
-  };
+      const dot = document.createElement('div');
+      dot.className = 'color-dot';
+      dot.style.backgroundColor = color;
+      dot.dataset.color = color;
+      if (color === selectedColor) dot.classList.add('selected');
+      dot.onclick = () => {
+        document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('selected'));
+        dot.classList.add('selected');
+        selectedColor = color;
+      };
 
-  const label = document.createElement('div');
-  label.className = 'count-label';
-  label.id = `count-${color}`;
-  label.innerText = '0';
+      const countText = document.createElement('div');
+      countText.id = `count-${color}`;
+      countText.textContent = '0';
 
-  container.appendChild(dot);
-  container.appendChild(label);
-  toolbar.appendChild(container);
+      const resetBtn = document.createElement('button');
+      resetBtn.textContent = 'Reset';
+      resetBtn.className = 'reset-button';
+      resetBtn.onclick = () => {
+        // Remove marks of this color
+        for (let i = marks.length - 1; i >= 0; i--) {
+          if (marks[i].color === color) {
+            marks.splice(i, 1);
+          }
+        }
+        counts[color] = 0;
+        updateCounts();
+        document.querySelectorAll(`.mark`).forEach(mark => {
+          if (mark.style.backgroundColor === color) {
+            mark.remove();
+          }
+        });
+      };
 
-  counts[color] = 0;
-});
+      wrapper.appendChild(dot);
+      wrapper.appendChild(countText);
+      wrapper.appendChild(resetBtn);
+      toolbar.appendChild(wrapper);
 
-function updateCounts() {
-  colors.forEach(color => {
-    const label = document.getElementById(`count-${color}`);
-    if (label) label.innerText = counts[color];
-  });
-}
+      counts[color] = 0;
+    });
+
+    function updateCounts() {
+      colors.forEach(color => {
+        document.getElementById(`count-${color}`).textContent = counts[color];
+      });
+    }
 
     document.getElementById('upload').addEventListener('change', e => {
       const file = e.target.files[0];
@@ -120,7 +144,7 @@ function updateCounts() {
     function renderPage(pageNum) {
       pdf.getPage(pageNum).then(page => {
         currentPage = page;
-        const viewport = page.getViewport({ scale: 1.5 });
+        viewport = page.getViewport({ scale: 1 });
         canvas.width = viewport.width;
         canvas.height = viewport.height;
         container.style.width = viewport.width + 'px';
@@ -147,15 +171,37 @@ function updateCounts() {
       updateCounts();
     });
 
+    function resetMarks() {
+      marks.length = 0;
+      colors.forEach(color => counts[color] = 0);
+      updateCounts();
+      document.querySelectorAll('.mark').forEach(mark => mark.remove());
+    }
+
     async function savePDF() {
       const { jsPDF } = window.jspdf;
       const pdfDoc = new jsPDF({ unit: 'px', format: [canvas.width, canvas.height] });
       const imgData = canvas.toDataURL('image/jpeg');
       pdfDoc.addImage(imgData, 'JPEG', 0, 0, canvas.width, canvas.height);
 
+      // Draw marks
       marks.forEach(mark => {
         pdfDoc.setFillColor(mark.color);
         pdfDoc.circle(mark.x, mark.y, 5, 'F');
+      });
+
+      // Add count summary at the top
+      pdfDoc.setFontSize(12);
+      let textY = 20;
+      pdfDoc.setTextColor(0, 0, 0);
+      pdfDoc.text('Color Counts:', 10, textY);
+      textY += 15;
+      colors.forEach(color => {
+        if (counts[color] > 0) {
+          pdfDoc.setTextColor(color);
+          pdfDoc.text(`${color}: ${counts[color]}`, 10, textY);
+          textY += 15;
+        }
       });
 
       pdfDoc.save('marked.pdf');
