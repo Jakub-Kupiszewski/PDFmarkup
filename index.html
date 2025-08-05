@@ -6,8 +6,12 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <style>
+    body {
+      font-family: "Haas Grot Text R Web", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    }
     #toolbar {
       display: flex;
+      justify-content: center;
       align-items: center;
       padding: 10px;
       background: #f5f5f5;
@@ -56,6 +60,38 @@
       border: none;
       background: none;
     }
+    .button-1 {
+      background-color: #EA4C89;
+      border-radius: 8px;
+      border-style: none;
+      box-sizing: border-box;
+      color: #FFFFFF;
+      cursor: pointer;
+      display: inline-block;
+      font-family: "Haas Grot Text R Web", "Helvetica Neue", Helvetica, Arial, sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      height: 40px;
+      line-height: 20px;
+      list-style: none;
+      margin: 5px;
+      outline: none;
+      padding: 10px 16px;
+      position: relative;
+      text-align: center;
+      text-decoration: none;
+      transition: color 100ms;
+      vertical-align: baseline;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: manipulation;
+    }
+
+    .button-1:hover,
+    .button-1:focus {
+      background-color: #F082AC;
+    }
+
     #zoom-level {
       margin-left: 10px;
       font-weight: bold;
@@ -64,14 +100,19 @@
 </head>
 <body>
   <div id="toolbar"></div>
-  <input type="file" id="upload" accept="application/pdf">
-  <button onclick="savePDF()">Save Marked PDF</button>
-  <button onclick="resetMarks()">Reset</button>
-  <button onclick="zoomIn()">Zoom In</button>
-  <button onclick="zoomOut()">Zoom Out</button>
-  <button onclick="fitToScreen()">Fit to Screen</button>
-  <button onclick="toggleFullscreen()">Fullscreen</button>
-  <span id="zoom-level">Zoom: 100%</span>
+  <div style="text-align:center">
+    <input type="file" id="upload" accept="application/pdf" class="button-1">
+    <button onclick="savePDF()" class="button-1">Save Marked PDF</button>
+    <button onclick="resetMarks()" class="button-1">Reset</button>
+    <button onclick="zoomIn()" class="button-1">Zoom In</button>
+    <button onclick="zoomOut()" class="button-1">Zoom Out</button>
+    <button onclick="fitToScreen()" class="button-1">Fit to Screen</button>
+    <button onclick="toggleFullscreen()" class="button-1">Fullscreen</button>
+    <button onclick="previousPage()" class="button-1">Previous Page</button>
+    <button onclick="nextPage()" class="button-1">Next Page</button>
+    <span id="zoom-level">Zoom: 100%</span>
+    <span id="page-info" style="margin-left: 10px; font-weight: bold;">Page: 1</span>
+  </div>
   <div id="canvas-container">
     <canvas id="pdf-canvas"></canvas>
   </div>
@@ -79,18 +120,37 @@
   <script>
     const colors = ['red', 'green', 'blue', 'orange', 'purple', 'cyan', 'magenta', 'yellow', 'black', 'gray'];
     const counts = {};
-    const marks = [];
+    const marks = {}; // pageNum => [{x, y, color}]
     let selectedColor = colors[0];
-    let pdf = null, currentPage = null, viewport = null, scale = 1;
+    let pdf = null, currentPage = 1, totalPages = 1, viewport = null, scale = 1;
 
     const toolbar = document.getElementById('toolbar');
     const container = document.getElementById('canvas-container');
     const canvas = document.getElementById('pdf-canvas');
     const ctx = canvas.getContext('2d');
     const zoomDisplay = document.getElementById('zoom-level');
+    const pageInfo = document.getElementById('page-info');
 
     function updateZoomLevel() {
       zoomDisplay.textContent = `Zoom: ${Math.round(scale * 100)}%`;
+    }
+
+    function updatePageInfo() {
+      pageInfo.textContent = `Page: ${currentPage}`;
+    }
+
+    function previousPage() {
+      if (currentPage > 1) {
+        currentPage--;
+        renderPage(currentPage);
+      }
+    }
+
+    function nextPage() {
+      if (currentPage < totalPages) {
+        currentPage++;
+        renderPage(currentPage);
+      }
     }
 
     colors.forEach(color => {
@@ -116,14 +176,11 @@
       resetBtn.textContent = 'Reset';
       resetBtn.className = 'reset-button';
       resetBtn.onclick = () => {
-        for (let i = marks.length - 1; i >= 0; i--) {
-          if (marks[i].color === color) marks.splice(i, 1);
-        }
+        if (!marks[currentPage]) return;
+        marks[currentPage] = marks[currentPage].filter(m => m.color !== color);
         counts[color] = 0;
         updateCounts();
-        document.querySelectorAll(`.mark`).forEach(mark => {
-          if (mark.style.backgroundColor === color) mark.remove();
-        });
+        renderPage(currentPage);
       };
 
       wrapper.appendChild(dot);
@@ -148,7 +205,9 @@
         const typedarray = new Uint8Array(this.result);
         pdfjsLib.getDocument(typedarray).promise.then(doc => {
           pdf = doc;
-          renderPage(1);
+          totalPages = doc.numPages;
+          currentPage = 1;
+          renderPage(currentPage);
         });
       };
       reader.readAsArrayBuffer(file);
@@ -156,49 +215,24 @@
 
     function renderPage(pageNum) {
       pdf.getPage(pageNum).then(page => {
-        currentPage = page;
-        viewport = page.getViewport({ scale: scale });
+        viewport = page.getViewport({ scale });
         canvas.width = viewport.width;
         canvas.height = viewport.height;
         container.style.width = viewport.width + 'px';
         container.style.height = viewport.height + 'px';
         const renderContext = { canvasContext: ctx, viewport: viewport };
         page.render(renderContext);
+
         redrawMarks();
         updateZoomLevel();
+        updatePageInfo();
       });
-    }
-
-    function zoomIn() {
-      scale += 0.1;
-      renderPage(1);
-    }
-
-    function zoomOut() {
-      if (scale > 0.2) {
-        scale -= 0.1;
-        renderPage(1);
-      }
-    }
-
-    function fitToScreen() {
-      if (!viewport) return;
-      const containerWidth = window.innerWidth - 40;
-      scale = containerWidth / viewport.width;
-      renderPage(1);
-    }
-
-    function toggleFullscreen() {
-      if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen();
-      } else {
-        document.exitFullscreen();
-      }
     }
 
     function redrawMarks() {
       document.querySelectorAll('.mark').forEach(mark => mark.remove());
-      marks.forEach(({ x, y, color }) => {
+      if (!marks[currentPage]) return;
+      marks[currentPage].forEach(({ x, y, color }) => {
         const scaledX = x * scale;
         const scaledY = y * scale;
         const dot = document.createElement('div');
@@ -215,6 +249,8 @@
       const x = (e.clientX - rect.left) / scale;
       const y = (e.clientY - rect.top) / scale;
 
+      if (!marks[currentPage]) marks[currentPage] = [];
+
       const dot = document.createElement('div');
       dot.className = 'mark';
       dot.style.left = `${x * scale - 5}px`;
@@ -222,28 +258,45 @@
       dot.style.backgroundColor = selectedColor;
       container.appendChild(dot);
 
-      marks.push({ x, y, color: selectedColor });
+      marks[currentPage].push({ x, y, color: selectedColor });
       counts[selectedColor]++;
       updateCounts();
     });
 
     function resetMarks() {
-      marks.length = 0;
+      Object.keys(marks).forEach(page => marks[page] = []);
       colors.forEach(color => counts[color] = 0);
       updateCounts();
-      document.querySelectorAll('.mark').forEach(mark => mark.remove());
+      renderPage(currentPage);
     }
 
     async function savePDF() {
       const { jsPDF } = window.jspdf;
-      const pdfDoc = new jsPDF({ unit: 'px', format: [canvas.width, canvas.height] });
-      const imgData = canvas.toDataURL('image/jpeg');
-      pdfDoc.addImage(imgData, 'JPEG', 0, 0, canvas.width, canvas.height);
+      const doc = await pdf.getPage(1);
+      const originalViewport = doc.getViewport({ scale: 1 });
+      const pdfDoc = new jsPDF({ unit: 'px', format: [originalViewport.width, originalViewport.height] });
 
-      marks.forEach(mark => {
-        pdfDoc.setFillColor(mark.color);
-        pdfDoc.circle(mark.x, mark.y, 5, 'F');
-      });
+      for (let i = 1; i <= totalPages; i++) {
+        const page = await pdf.getPage(i);
+        const viewport = page.getViewport({ scale: 1 });
+        const canvasTemp = document.createElement('canvas');
+        canvasTemp.width = viewport.width;
+        canvasTemp.height = viewport.height;
+        const ctxTemp = canvasTemp.getContext('2d');
+        await page.render({ canvasContext: ctxTemp, viewport }).promise;
+
+        const imgData = canvasTemp.toDataURL('image/jpeg');
+        if (i > 1) pdfDoc.addPage([viewport.width, viewport.height]);
+        pdfDoc.setPage(i);
+        pdfDoc.addImage(imgData, 'JPEG', 0, 0, viewport.width, viewport.height);
+
+        if (marks[i]) {
+          marks[i].forEach(mark => {
+            pdfDoc.setFillColor(mark.color);
+            pdfDoc.circle(mark.x, mark.y, 5, 'F');
+          });
+        }
+      }
 
       pdfDoc.setFontSize(12);
       let textY = 20;
